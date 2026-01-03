@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Loader2, LogOut } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
+import { Loader2, Users, Building2, ArrowRight } from "lucide-react";
+import { DashboardNavbar } from "@/components/layout/DashboardNavbar";
 import { Footer } from "@/components/layout/Footer";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface Profile {
   full_name: string;
@@ -52,11 +52,6 @@ export default function DashboardPage() {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -67,42 +62,66 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-muted">
-      <Navbar />
+      <DashboardNavbar />
       
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
-            <div className="bg-background rounded-2xl p-8 shadow-sm border border-divider">
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h1 className="font-display text-3xl font-medium text-foreground mb-2">
-                    Welcome, {profile?.full_name}!
-                  </h1>
-                  <p className="text-muted-foreground">
-                    You're logged in as a{" "}
-                    <span className="capitalize font-medium text-primary">
-                      {profile?.user_type}
-                    </span>
-                    {profile?.organisation && (
-                      <> at {profile.organisation}</>
-                    )}
-                  </p>
-                </div>
-                <Button variant="outline" onClick={handleSignOut}>
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </Button>
-              </div>
+            {/* Welcome Section */}
+            <div className="mb-8">
+              <h1 className="font-display text-3xl lg:text-4xl font-medium text-foreground mb-2">
+                Welcome back, {profile?.full_name}!
+              </h1>
+              <p className="text-muted-foreground">
+                You're logged in as a{" "}
+                <span className="capitalize font-medium text-primary">
+                  {profile?.user_type}
+                </span>
+                {profile?.organisation && (
+                  <> at {profile.organisation}</>
+                )}
+              </p>
+            </div>
 
-              <div className="bg-primary/5 rounded-xl p-6 border border-primary/10">
-                <h2 className="font-display text-lg font-medium text-foreground mb-2">
-                  Your Dashboard is Ready
-                </h2>
-                <p className="text-muted-foreground text-sm">
-                  Full profile editing, posts, member search, and connection features will be available soon. 
-                  Your account has been approved and you now have access to the AdvisorNet platform.
-                </p>
-              </div>
+            {/* Quick Links */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Link to="/advisors">
+                <Card className="group hover:shadow-lg transition-all duration-300 border-divider cursor-pointer">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                      <Users className="w-7 h-7 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-display text-lg font-medium text-foreground mb-1">
+                        Advisor Network
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Browse and connect with advisors
+                      </p>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </CardContent>
+                </Card>
+              </Link>
+
+              <Link to="/laboratories">
+                <Card className="group hover:shadow-lg transition-all duration-300 border-divider cursor-pointer">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                      <Building2 className="w-7 h-7 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-display text-lg font-medium text-foreground mb-1">
+                        Laboratory Network
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Browse and connect with laboratories
+                      </p>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </CardContent>
+                </Card>
+              </Link>
             </div>
           </div>
         </div>

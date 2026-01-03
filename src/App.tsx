@@ -8,6 +8,9 @@ import AuthPage from "./pages/AuthPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdvisorsPage from "./pages/AdvisorsPage";
+import LaboratoriesPage from "./pages/LaboratoriesPage";
+import EditProfilePage from "./pages/EditProfilePage";
 import AboutPage from "./pages/AboutPage";
 import ContactPage from "./pages/ContactPage";
 import InvestmentsPage from "./pages/InvestmentsPage";
@@ -29,6 +32,9 @@ const App = () => (
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/advisors" element={<AdvisorsPage />} />
+          <Route path="/laboratories" element={<LaboratoriesPage />} />
+          <Route path="/edit-profile" element={<EditProfilePage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/investments" element={<InvestmentsPage />} />
