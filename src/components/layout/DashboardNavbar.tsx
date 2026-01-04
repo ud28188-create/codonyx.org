@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
-import { Menu, X, LogOut, User } from "lucide-react";
+import { Menu, X, LogOut, User, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
@@ -27,9 +27,10 @@ export function DashboardNavbar() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const loadProfile = async () => {
+    const loadProfileAndCheckAdmin = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         const { data } = await supabase
@@ -40,9 +41,16 @@ export function DashboardNavbar() {
         if (data) {
           setProfile(data);
         }
+
+        // Check if user is admin
+        const { data: hasAdminRole } = await supabase.rpc('has_role', {
+          _user_id: session.user.id,
+          _role: 'admin'
+        });
+        setIsAdmin(hasAdminRole === true);
       }
     };
-    loadProfile();
+    loadProfileAndCheckAdmin();
   }, []);
 
   const handleSignOut = async () => {
@@ -94,6 +102,15 @@ export function DashboardNavbar() {
                 Edit Profile
               </Button>
             </Link>
+            
+            {isAdmin && (
+              <Link to="/admin">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Shield className="h-4 w-4" />
+                  Admin
+                </Button>
+              </Link>
+            )}
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -159,6 +176,16 @@ export function DashboardNavbar() {
             >
               Edit Profile
             </Link>
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className="flex items-center gap-2 text-sm font-medium tracking-wide uppercase text-muted-foreground hover:text-primary transition-colors py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Shield className="h-4 w-4" />
+                Admin Panel
+              </Link>
+            )}
             <Button variant="outline" className="w-full mt-4" onClick={handleSignOut}>
               <LogOut className="w-4 h-4 mr-2" />
               Sign Out
