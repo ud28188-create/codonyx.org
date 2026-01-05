@@ -7,13 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Check, X, Building2, Phone, Mail, MapPin, Clock, Link2, Copy, Plus, Trash2, CalendarIcon, Pencil, Power } from "lucide-react";
+import { Check, X, Building2, Phone, Mail, MapPin, Clock, Link2, Copy, CalendarIcon, Power } from "lucide-react";
 import { DashboardNavbar } from "@/components/layout/DashboardNavbar";
 import { Footer } from "@/components/layout/Footer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +30,7 @@ interface PendingUser {
   bio: string | null;
 }
 
-interface InviteToken {
+interface InviteConfig {
   id: string;
   token: string;
   is_active: boolean;
@@ -40,19 +39,17 @@ interface InviteToken {
   used_by: string | null;
 }
 
+const FIXED_INVITE_PATH = "/register?invite=advisornet-invite-2024";
+
 const AdminDashboard = () => {
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
-  const [inviteTokens, setInviteTokens] = useState<InviteToken[]>([]);
+  const [inviteConfig, setInviteConfig] = useState<InviteConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [creatingToken, setCreatingToken] = useState(false);
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [expirationDate, setExpirationDate] = useState<Date>(addDays(new Date(), 7));
-  const [customToken, setCustomToken] = useState("");
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingToken, setEditingToken] = useState<InviteToken | null>(null);
-  const [editExpirationDate, setEditExpirationDate] = useState<Date>(new Date());
-  const [editTokenText, setEditTokenText] = useState("");
+  const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -68,7 +65,6 @@ const AdminDashboard = () => {
       return;
     }
 
-    // Check if user is admin using the has_role function
     const { data: hasAdminRole, error } = await supabase.rpc('has_role', {
       _user_id: user.id,
       _role: 'admin'
@@ -86,19 +82,21 @@ const AdminDashboard = () => {
 
     setIsAdmin(true);
     fetchPendingUsers();
-    fetchInviteTokens();
+    fetchInviteConfig();
   };
 
-  const fetchInviteTokens = async () => {
+  const fetchInviteConfig = async () => {
     const { data, error } = await supabase
       .from("invite_tokens")
       .select("*")
-      .order("created_at", { ascending: false });
+      .eq("token", "advisornet-invite-2024")
+      .single();
 
-    if (error) {
-      console.error("Error fetching invite tokens:", error);
-    } else {
-      setInviteTokens(data || []);
+    if (error && error.code !== "PGRST116") {
+      console.error("Error fetching invite config:", error);
+    } else if (data) {
+      setInviteConfig(data);
+      setExpirationDate(new Date(data.expires_at));
     }
   };
 
@@ -146,61 +144,71 @@ const AdminDashboard = () => {
     setProcessingId(null);
   };
 
-  const createInviteToken = async () => {
-    if (!customToken.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a custom invite link text.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setCreatingToken(true);
+  const saveInviteConfig = async () => {
+    setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
-    
-    // Deactivate all existing tokens when creating a new one
-    await supabase
-      .from("invite_tokens")
-      .update({ is_active: false })
-      .neq("id", "00000000-0000-0000-0000-000000000000"); // Update all
 
-    const { data, error } = await supabase
-      .from("invite_tokens")
-      .insert({ 
-        created_by: user?.id,
-        token: customToken.trim(),
-        expires_at: expirationDate.toISOString(),
-        is_active: true
-      })
-      .select()
-      .single();
+    if (inviteConfig) {
+      // Update existing config
+      const { error } = await supabase
+        .from("invite_tokens")
+        .update({ 
+          expires_at: expirationDate.toISOString(),
+          is_active: true
+        })
+        .eq("id", inviteConfig.id);
 
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message.includes("duplicate") 
-          ? "This link text already exists. Please use a different one."
-          : "Failed to create invite link.",
-        variant: "destructive",
-      });
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to update invite link.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Invite link settings saved.",
+        });
+        fetchInviteConfig();
+      }
     } else {
-      toast({
-        title: "Success",
-        description: "Invite link created. All previous links are now inactive.",
-      });
-      fetchInviteTokens(); // Refresh to show updated statuses
-      setCustomToken("");
-      setExpirationDate(addDays(new Date(), 7));
+      // Create new config with fixed token
+      const { data, error } = await supabase
+        .from("invite_tokens")
+        .insert({ 
+          created_by: user?.id,
+          token: "advisornet-invite-2024",
+          expires_at: expirationDate.toISOString(),
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to create invite link.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Invite link created and enabled.",
+        });
+        setInviteConfig(data);
+      }
     }
-    setCreatingToken(false);
+    setSaving(false);
   };
 
-  const toggleTokenStatus = async (tokenId: string, currentStatus: boolean) => {
+  const toggleLinkStatus = async () => {
+    if (!inviteConfig) return;
+
+    const newStatus = !inviteConfig.is_active;
     const { error } = await supabase
       .from("invite_tokens")
-      .update({ is_active: !currentStatus })
-      .eq("id", tokenId);
+      .update({ is_active: newStatus })
+      .eq("id", inviteConfig.id);
 
     if (error) {
       toast({
@@ -211,90 +219,16 @@ const AdminDashboard = () => {
     } else {
       toast({
         title: "Success",
-        description: `Link ${currentStatus ? "disabled" : "enabled"}.`,
+        description: `Link ${newStatus ? "enabled" : "disabled"}.`,
       });
-      setInviteTokens(prev => 
-        prev.map(t => t.id === tokenId ? { ...t, is_active: !currentStatus } : t)
-      );
+      setInviteConfig(prev => prev ? { ...prev, is_active: newStatus } : null);
     }
   };
 
-  const openEditDialog = (token: InviteToken) => {
-    setEditingToken(token);
-    setEditExpirationDate(new Date(token.expires_at));
-    setEditTokenText(token.token);
-    setEditDialogOpen(true);
-  };
-
-  const saveEditToken = async () => {
-    if (!editingToken) return;
-
-    if (!editTokenText.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a link text.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Deactivate all other tokens and activate this one
-    await supabase
-      .from("invite_tokens")
-      .update({ is_active: false })
-      .neq("id", editingToken.id);
-
-    const { error } = await supabase
-      .from("invite_tokens")
-      .update({ 
-        token: editTokenText.trim(),
-        expires_at: editExpirationDate.toISOString(),
-        is_active: true
-      })
-      .eq("id", editingToken.id);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message.includes("duplicate")
-          ? "This link text already exists."
-          : "Failed to update invite link.",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Invite link updated. This is now the only active link.",
-      });
-      fetchInviteTokens();
-      setEditDialogOpen(false);
-      setEditingToken(null);
-    }
-  };
-
-  const deleteInviteToken = async (tokenId: string) => {
-    const { error } = await supabase
-      .from("invite_tokens")
-      .delete()
-      .eq("id", tokenId);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete invite link.",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Invite link deleted.",
-      });
-      setInviteTokens(prev => prev.filter(t => t.id !== tokenId));
-    }
-  };
-
-  const copyInviteLink = (token: string) => {
-    const link = `${window.location.origin}/register?inviteToken=${token}`;
+  const copyInviteLink = () => {
+    const baseUrl = websiteUrl.trim() || window.location.origin;
+    const cleanUrl = baseUrl.replace(/\/$/, "");
+    const link = `${cleanUrl}${FIXED_INVITE_PATH}`;
     navigator.clipboard.writeText(link);
     toast({
       title: "Copied!",
@@ -306,19 +240,14 @@ const AdminDashboard = () => {
     return format(new Date(dateString), "MMM d, yyyy h:mm a");
   };
 
-  const isTokenExpired = (expiresAt: string) => {
-    return new Date(expiresAt) < new Date();
-  };
+  const isExpired = inviteConfig ? new Date(inviteConfig.expires_at) < new Date() : false;
+  const isInvalid = inviteConfig ? (!inviteConfig.is_active || isExpired) : true;
 
-  const getTokenStatus = (token: InviteToken) => {
-    if (token.used_by) return { label: "Used", variant: "secondary" as const };
-    if (!token.is_active) return { label: "Disabled", variant: "outline" as const };
-    if (isTokenExpired(token.expires_at)) return { label: "Expired", variant: "destructive" as const };
+  const getStatus = () => {
+    if (!inviteConfig) return { label: "Not Created", variant: "outline" as const };
+    if (!inviteConfig.is_active) return { label: "Disabled", variant: "outline" as const };
+    if (isExpired) return { label: "Expired", variant: "destructive" as const };
     return { label: "Active", variant: "default" as const };
-  };
-
-  const isTokenInvalid = (token: InviteToken) => {
-    return !token.is_active || isTokenExpired(token.expires_at) || !!token.used_by;
   };
 
   if (!isAdmin) {
@@ -328,6 +257,8 @@ const AdminDashboard = () => {
       </div>
     );
   }
+
+  const status = getStatus();
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -343,7 +274,7 @@ const AdminDashboard = () => {
         <Tabs defaultValue="pending" className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="pending">Pending Users</TabsTrigger>
-            <TabsTrigger value="invites">Invite Links</TabsTrigger>
+            <TabsTrigger value="invites">Invite Link</TabsTrigger>
           </TabsList>
 
           <TabsContent value="pending">
@@ -441,214 +372,113 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="invites">
-            <Card className="mb-6">
+            <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Link2 className="h-5 w-5" />
-                  Create Invite Link
+                  Invite Link Configuration
                 </CardTitle>
                 <CardDescription>
-                  Create a custom invite link. Only the latest saved link will be active.
+                  Configure the registration invite link with expiration date and enable/disable it.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <Label>Custom Link Text</Label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground whitespace-nowrap">
-                        {window.location.origin}/register?inviteToken=
-                      </span>
-                      <Input
-                        value={customToken}
-                        onChange={(e) => setCustomToken(e.target.value)}
-                        placeholder="your-secret-code"
-                        className="flex-1"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
-                    <div className="space-y-2">
-                      <Label>Expiration Date</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-[240px] justify-start text-left font-normal",
-                              !expirationDate && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {expirationDate ? format(expirationDate, "PPP") : <span>Pick a date</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={expirationDate}
-                            onSelect={(date) => date && setExpirationDate(date)}
-                            disabled={(date) => date < new Date()}
-                            initialFocus
-                            className="pointer-events-auto"
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <Button 
-                      onClick={createInviteToken} 
-                      disabled={creatingToken || !customToken.trim()} 
+              <CardContent className="space-y-6">
+                {/* Fixed Invite Path Display */}
+                <div className="space-y-2">
+                  <Label>Invite Link</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={websiteUrl}
+                      onChange={(e) => setWebsiteUrl(e.target.value)}
+                      placeholder="https://yourwebsite.com"
+                      className="max-w-[250px]"
+                    />
+                    <span className="text-sm font-mono text-muted-foreground bg-muted px-3 py-2 rounded-md">
+                      {FIXED_INVITE_PATH}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={copyInviteLink}
+                      disabled={isInvalid}
                       className="gap-2"
                     >
-                      <Plus className="h-4 w-4" />
-                      {creatingToken ? "Creating..." : "Create & Activate Link"}
+                      <Copy className="h-4 w-4" />
+                      Copy
                     </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Enter your website URL to generate the full invite link.
+                  </p>
                 </div>
+
+                {/* Status Display */}
+                <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      <Badge variant={status.variant}>{status.label}</Badge>
+                      {isInvalid && inviteConfig && (
+                        <span className="text-sm text-destructive font-medium">Invalid Link</span>
+                      )}
+                    </div>
+                    {inviteConfig && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Expires: {formatDate(inviteConfig.expires_at)}
+                      </p>
+                    )}
+                  </div>
+                  {inviteConfig && (
+                    <Button
+                      variant={inviteConfig.is_active ? "outline" : "default"}
+                      size="sm"
+                      onClick={toggleLinkStatus}
+                      className="gap-2"
+                    >
+                      <Power className="h-4 w-4" />
+                      {inviteConfig.is_active ? "Disable" : "Enable"}
+                    </Button>
+                  )}
+                </div>
+
+                {/* Expiration Date Picker */}
+                <div className="space-y-2">
+                  <Label>Expiration Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-[240px] justify-start text-left font-normal",
+                          !expirationDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {expirationDate ? format(expirationDate, "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={expirationDate}
+                        onSelect={(date) => date && setExpirationDate(date)}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Save Button */}
+                <Button 
+                  onClick={saveInviteConfig} 
+                  disabled={saving}
+                  className="w-full sm:w-auto"
+                >
+                  {saving ? "Saving..." : inviteConfig ? "Save Changes" : "Create & Enable Link"}
+                </Button>
               </CardContent>
             </Card>
-
-            {inviteTokens.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <p className="text-muted-foreground">No invite links created yet.</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {inviteTokens.map((token) => {
-                  const status = getTokenStatus(token);
-                  const invalid = isTokenInvalid(token);
-                  
-                  return (
-                    <Card key={token.id} className={invalid ? "opacity-60" : ""}>
-                      <CardContent className="py-4">
-                        <div className="flex flex-col md:flex-row md:items-center gap-4">
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Input
-                                readOnly
-                                value={`${window.location.origin}/register?inviteToken=${token.token}`}
-                                className="font-mono text-sm flex-1 min-w-0"
-                              />
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => copyInviteLink(token.token)}
-                                disabled={invalid}
-                                className="gap-2"
-                              >
-                                <Copy className="h-4 w-4" />
-                                Copy
-                              </Button>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                              <span>Created: {formatDate(token.created_at)}</span>
-                              <span>Expires: {formatDate(token.expires_at)}</span>
-                              <Badge variant={status.variant}>{status.label}</Badge>
-                              {invalid && !token.used_by && (
-                                <span className="text-destructive font-medium">Invalid Link</span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => toggleTokenStatus(token.id, token.is_active)}
-                              disabled={!!token.used_by}
-                              className="gap-2"
-                              title={token.is_active ? "Disable link" : "Enable link"}
-                            >
-                              <Power className="h-4 w-4" />
-                              {token.is_active ? "Disable" : "Enable"}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openEditDialog(token)}
-                              disabled={!!token.used_by}
-                              className="gap-2"
-                            >
-                              <Pencil className="h-4 w-4" />
-                              Edit
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => deleteInviteToken(token.id)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Edit Dialog */}
-            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Edit Invite Link</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Link Text</Label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground whitespace-nowrap">
-                        .../register?inviteToken=
-                      </span>
-                      <Input
-                        value={editTokenText}
-                        onChange={(e) => setEditTokenText(e.target.value)}
-                        placeholder="your-secret-code"
-                        className="flex-1"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Expiration Date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !editExpirationDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {editExpirationDate ? format(editExpirationDate, "PPP") : <span>Pick a date</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={editExpirationDate}
-                          onSelect={(date) => date && setEditExpirationDate(date)}
-                          disabled={(date) => date < new Date()}
-                          initialFocus
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={saveEditToken} disabled={!editTokenText.trim()}>
-                    Save & Activate
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
           </TabsContent>
         </Tabs>
       </main>
