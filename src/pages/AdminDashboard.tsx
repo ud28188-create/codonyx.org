@@ -48,9 +48,11 @@ const AdminDashboard = () => {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [creatingToken, setCreatingToken] = useState(false);
   const [expirationDate, setExpirationDate] = useState<Date>(addDays(new Date(), 7));
+  const [customToken, setCustomToken] = useState("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingToken, setEditingToken] = useState<InviteToken | null>(null);
   const [editExpirationDate, setEditExpirationDate] = useState<Date>(new Date());
+  const [editTokenText, setEditTokenText] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -145,14 +147,31 @@ const AdminDashboard = () => {
   };
 
   const createInviteToken = async () => {
+    if (!customToken.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a custom invite link text.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCreatingToken(true);
     const { data: { user } } = await supabase.auth.getUser();
     
+    // Deactivate all existing tokens when creating a new one
+    await supabase
+      .from("invite_tokens")
+      .update({ is_active: false })
+      .neq("id", "00000000-0000-0000-0000-000000000000"); // Update all
+
     const { data, error } = await supabase
       .from("invite_tokens")
       .insert({ 
         created_by: user?.id,
-        expires_at: expirationDate.toISOString()
+        token: customToken.trim(),
+        expires_at: expirationDate.toISOString(),
+        is_active: true
       })
       .select()
       .single();
@@ -160,16 +179,19 @@ const AdminDashboard = () => {
     if (error) {
       toast({
         title: "Error",
-        description: "Failed to create invite link.",
+        description: error.message.includes("duplicate") 
+          ? "This link text already exists. Please use a different one."
+          : "Failed to create invite link.",
         variant: "destructive",
       });
     } else {
       toast({
         title: "Success",
-        description: "Invite link created successfully.",
+        description: "Invite link created. All previous links are now inactive.",
       });
-      setInviteTokens(prev => [data, ...prev]);
-      setExpirationDate(addDays(new Date(), 7)); // Reset to default
+      fetchInviteTokens(); // Refresh to show updated statuses
+      setCustomToken("");
+      setExpirationDate(addDays(new Date(), 7));
     }
     setCreatingToken(false);
   };
@@ -200,31 +222,51 @@ const AdminDashboard = () => {
   const openEditDialog = (token: InviteToken) => {
     setEditingToken(token);
     setEditExpirationDate(new Date(token.expires_at));
+    setEditTokenText(token.token);
     setEditDialogOpen(true);
   };
 
   const saveEditToken = async () => {
     if (!editingToken) return;
 
+    if (!editTokenText.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a link text.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Deactivate all other tokens and activate this one
+    await supabase
+      .from("invite_tokens")
+      .update({ is_active: false })
+      .neq("id", editingToken.id);
+
     const { error } = await supabase
       .from("invite_tokens")
-      .update({ expires_at: editExpirationDate.toISOString() })
+      .update({ 
+        token: editTokenText.trim(),
+        expires_at: editExpirationDate.toISOString(),
+        is_active: true
+      })
       .eq("id", editingToken.id);
 
     if (error) {
       toast({
         title: "Error",
-        description: "Failed to update invite link.",
+        description: error.message.includes("duplicate")
+          ? "This link text already exists."
+          : "Failed to update invite link.",
         variant: "destructive",
       });
     } else {
       toast({
         title: "Success",
-        description: "Invite link updated.",
+        description: "Invite link updated. This is now the only active link.",
       });
-      setInviteTokens(prev =>
-        prev.map(t => t.id === editingToken.id ? { ...t, expires_at: editExpirationDate.toISOString() } : t)
-      );
+      fetchInviteTokens();
       setEditDialogOpen(false);
       setEditingToken(null);
     }
@@ -403,45 +445,65 @@ const AdminDashboard = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Link2 className="h-5 w-5" />
-                  Invite Links
+                  Create Invite Link
                 </CardTitle>
                 <CardDescription>
-                  Create and manage registration invite links with custom expiration dates.
+                  Create a custom invite link. Only the latest saved link will be active.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+                <div className="grid gap-4">
                   <div className="space-y-2">
-                    <Label>Expiration Date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-[240px] justify-start text-left font-normal",
-                            !expirationDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {expirationDate ? format(expirationDate, "PPP") : <span>Pick a date</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={expirationDate}
-                          onSelect={(date) => date && setExpirationDate(date)}
-                          disabled={(date) => date < new Date()}
-                          initialFocus
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <Label>Custom Link Text</Label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">
+                        {window.location.origin}/register?inviteToken=
+                      </span>
+                      <Input
+                        value={customToken}
+                        onChange={(e) => setCustomToken(e.target.value)}
+                        placeholder="your-secret-code"
+                        className="flex-1"
+                      />
+                    </div>
                   </div>
-                  <Button onClick={createInviteToken} disabled={creatingToken} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    {creatingToken ? "Creating..." : "Create New Invite Link"}
-                  </Button>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+                    <div className="space-y-2">
+                      <Label>Expiration Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-[240px] justify-start text-left font-normal",
+                              !expirationDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {expirationDate ? format(expirationDate, "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={expirationDate}
+                            onSelect={(date) => date && setExpirationDate(date)}
+                            disabled={(date) => date < new Date()}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <Button 
+                      onClick={createInviteToken} 
+                      disabled={creatingToken || !customToken.trim()} 
+                      className="gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      {creatingToken ? "Creating..." : "Create & Activate Link"}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -536,6 +598,20 @@ const AdminDashboard = () => {
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
+                    <Label>Link Text</Label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">
+                        .../register?inviteToken=
+                      </span>
+                      <Input
+                        value={editTokenText}
+                        onChange={(e) => setEditTokenText(e.target.value)}
+                        placeholder="your-secret-code"
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Expiration Date</Label>
                     <Popover>
                       <PopoverTrigger asChild>
@@ -567,7 +643,9 @@ const AdminDashboard = () => {
                   <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={saveEditToken}>Save Changes</Button>
+                  <Button onClick={saveEditToken} disabled={!editTokenText.trim()}>
+                    Save & Activate
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
