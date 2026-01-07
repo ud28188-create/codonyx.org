@@ -1,68 +1,58 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Users, Building2, ArrowRight, Sparkles } from "lucide-react";
+import { Loader2, Users, Building2, ArrowRight } from "lucide-react";
 import { DashboardNavbar } from "@/components/layout/DashboardNavbar";
 import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
 interface Profile {
   full_name: string;
   email: string;
   user_type: string;
   organisation: string | null;
 }
-
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
   useEffect(() => {
     const checkAuthAndLoadProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const {
+        data: {
+          session
+        }
+      } = await supabase.auth.getSession();
       if (!session) {
         navigate("/auth");
         return;
       }
-
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("full_name, email, user_type, organisation")
-        .eq("user_id", session.user.id)
-        .maybeSingle();
-
+      const {
+        data: profileData
+      } = await supabase.from("profiles").select("full_name, email, user_type, organisation").eq("user_id", session.user.id).maybeSingle();
       if (profileData) {
         setProfile(profileData);
       }
       setIsLoading(false);
     };
-
     checkAuthAndLoadProfile();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === "SIGNED_OUT" || !session) {
-          navigate("/auth");
-        }
+    const {
+      data: {
+        subscription
       }
-    );
-
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        navigate("/auth");
+      }
+    });
     return () => subscription.unsubscribe();
   }, [navigate]);
-
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+    return <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="min-h-screen bg-muted">
+  return <div className="min-h-screen bg-muted">
       <DashboardNavbar />
       
       <main className="pt-24 pb-16">
@@ -71,7 +61,7 @@ export default function DashboardPage() {
             {/* Welcome Section - Enhanced */}
             <div className="bg-gradient-to-br from-primary/5 via-background to-primary/10 rounded-3xl p-8 md:p-10 mb-8 border border-divider relative overflow-hidden">
               <div className="absolute top-4 right-4">
-                <Sparkles className="w-6 h-6 text-primary/40" />
+                
               </div>
               <div className="relative z-10">
                 <h1 className="font-heading text-3xl lg:text-4xl font-semibold text-foreground mb-3">
@@ -82,9 +72,7 @@ export default function DashboardPage() {
                   <Badge variant="outline" className="capitalize font-medium text-primary border-primary/30 bg-primary/5 text-base px-3 py-1">
                     {profile?.user_type}
                   </Badge>
-                  {profile?.organisation && (
-                    <span className="text-foreground">at {profile.organisation}</span>
-                  )}
+                  {profile?.organisation && <span className="text-foreground">at {profile.organisation}</span>}
                 </p>
               </div>
             </div>
@@ -142,6 +130,5 @@ export default function DashboardPage() {
       </main>
 
       <Footer />
-    </div>
-  );
+    </div>;
 }
