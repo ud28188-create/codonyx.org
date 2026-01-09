@@ -92,13 +92,28 @@ export default function ProfileDetailPage() {
       .slice(0, 2);
   };
 
+  const tagColors = [
+    "bg-teal-400",
+    "bg-emerald-400",
+    "bg-amber-400",
+    "bg-sky-400",
+    "bg-rose-400",
+    "bg-violet-400",
+    "bg-orange-400",
+    "bg-lime-400",
+  ];
+
   const renderTags = (value: string | null) => {
     if (!value) return null;
     const tags = value.split(",").map(t => t.trim()).filter(Boolean);
     return (
       <div className="flex flex-wrap gap-2">
         {tags.map((tag, index) => (
-          <Badge key={index} variant="secondary" className="bg-primary/10 text-primary">
+          <Badge 
+            key={index} 
+            variant="secondary" 
+            className={`${tagColors[index % tagColors.length]} text-black font-medium hover:opacity-90`}
+          >
             {tag}
           </Badge>
         ))}

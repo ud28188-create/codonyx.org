@@ -63,22 +63,35 @@ export function TagInput({ value, onChange, placeholder, id }: TagInputProps) {
       </div>
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {tags.map((tag, index) => (
-            <Badge
-              key={index}
-              variant="secondary"
-              className="px-3 py-1 text-sm font-normal gap-1.5 bg-primary/10 text-primary hover:bg-primary/20"
-            >
-              {tag}
-              <button
-                type="button"
-                onClick={() => removeTag(tag)}
-                className="ml-1 hover:text-destructive transition-colors"
+          {tags.map((tag, index) => {
+            const colors = [
+              "bg-teal-400",
+              "bg-emerald-400",
+              "bg-amber-400",
+              "bg-sky-400",
+              "bg-rose-400",
+              "bg-violet-400",
+              "bg-orange-400",
+              "bg-lime-400",
+            ];
+            const colorClass = colors[index % colors.length];
+            return (
+              <Badge
+                key={index}
+                variant="secondary"
+                className={`px-3 py-1 text-sm font-medium gap-1.5 ${colorClass} text-black hover:opacity-90`}
               >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
+                {tag}
+                <button
+                  type="button"
+                  onClick={() => removeTag(tag)}
+                  className="ml-1 hover:text-black/70 transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            );
+          })}
         </div>
       )}
     </div>

@@ -105,19 +105,32 @@ export function AdvisorCard({
               Functional Areas for Mentoring
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {displayTags.map((tag, index) => (
-                <Badge
-                  key={index}
-                  variant="secondary"
-                  className="text-xs px-2 py-0.5 bg-primary/10 text-primary hover:bg-primary/20"
-                >
-                  {tag}
-                </Badge>
-              ))}
+              {displayTags.map((tag, index) => {
+                const colors = [
+                  "bg-teal-400",
+                  "bg-emerald-400",
+                  "bg-amber-400",
+                  "bg-sky-400",
+                  "bg-rose-400",
+                  "bg-violet-400",
+                  "bg-orange-400",
+                  "bg-lime-400",
+                ];
+                const colorClass = colors[index % colors.length];
+                return (
+                  <Badge
+                    key={index}
+                    variant="secondary"
+                    className={`text-xs px-2 py-0.5 ${colorClass} text-black font-medium hover:opacity-90`}
+                  >
+                    {tag}
+                  </Badge>
+                );
+              })}
               {remainingCount > 0 && (
                 <Badge
                   variant="outline"
-                  className="text-xs px-2 py-0.5"
+                  className="text-xs px-2 py-0.5 bg-muted text-foreground"
                 >
                   +{remainingCount}
                 </Badge>

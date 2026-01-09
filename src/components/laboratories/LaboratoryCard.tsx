@@ -89,15 +89,28 @@ export function LaboratoryCard({
         {/* Service Badges */}
         {servicesList.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {servicesList.map((service, index) => (
-              <Badge 
-                key={index} 
-                variant="outline" 
-                className="text-xs font-normal bg-muted/50"
-              >
-                {service}
-              </Badge>
-            ))}
+            {servicesList.map((service, index) => {
+              const colors = [
+                "bg-teal-400",
+                "bg-emerald-400",
+                "bg-amber-400",
+                "bg-sky-400",
+                "bg-rose-400",
+                "bg-violet-400",
+                "bg-orange-400",
+                "bg-lime-400",
+              ];
+              const colorClass = colors[index % colors.length];
+              return (
+                <Badge 
+                  key={index} 
+                  variant="secondary" 
+                  className={`text-xs font-medium ${colorClass} text-black hover:opacity-90`}
+                >
+                  {service}
+                </Badge>
+              );
+            })}
           </div>
         )}
 
