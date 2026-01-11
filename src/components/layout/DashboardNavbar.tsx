@@ -12,14 +12,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const navLinks = [
-  { name: "Advisors", href: "/advisors" },
-  { name: "Laboratories", href: "/laboratories" },
-];
-
 interface Profile {
   full_name: string;
   avatar_url: string | null;
+  user_type: "advisor" | "laboratory";
 }
 
 export function DashboardNavbar() {
@@ -29,17 +25,25 @@ export function DashboardNavbar() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Dynamic nav links based on user type
+  // Advisors see Laboratories, Labs see Advisors
+  const navLinks = profile?.user_type === "advisor" 
+    ? [{ name: "Laboratories", href: "/laboratories" }]
+    : profile?.user_type === "laboratory"
+    ? [{ name: "Advisors", href: "/advisors" }]
+    : [];
+
   useEffect(() => {
     const loadProfileAndCheckAdmin = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         const { data } = await supabase
           .from("profiles")
-          .select("full_name, avatar_url")
+          .select("full_name, avatar_url, user_type")
           .eq("user_id", session.user.id)
           .maybeSingle();
         if (data) {
-          setProfile(data);
+          setProfile(data as Profile);
         }
 
         // Check if user is admin

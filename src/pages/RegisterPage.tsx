@@ -3,10 +3,12 @@ import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { ArrowRight, Target, MessageCircle, Handshake, CheckCircle, Loader2, XCircle, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Target, MessageCircle, Handshake, CheckCircle, Loader2, XCircle, Eye, EyeOff, Upload, User } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const features = [
   {
@@ -38,6 +40,7 @@ export default function RegisterPage() {
   const [tokenId, setTokenId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Form state
   const [fullName, setFullName] = useState("");
@@ -49,6 +52,24 @@ export default function RegisterPage() {
   const [contactNumber, setContactNumber] = useState("");
   const [organisation, setOrganisation] = useState("");
   const [userType, setUserType] = useState<UserType>("advisor");
+  
+  // Additional fields
+  const [country, setCountry] = useState("");
+  const [city, setCity] = useState("");
+  const [bio, setBio] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  
+  // Advisor-specific fields
+  const [expertise, setExpertise] = useState("");
+  const [experience, setExperience] = useState("");
+  
+  // Laboratory-specific fields
+  const [companyType, setCompanyType] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [researchAreas, setResearchAreas] = useState("");
+  const [services, setServices] = useState("");
 
   // Validate invite token
   useEffect(() => {
@@ -87,6 +108,33 @@ export default function RegisterPage() {
 
     validateToken();
   }, [inviteToken]);
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload an image file.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Please upload an image smaller than 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setAvatarFile(file);
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onload = (e) => setAvatarUrl(e.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,16 +187,61 @@ export default function RegisterPage() {
         return;
       }
 
-      // Create profile
-      const { error: profileError } = await supabase.from("profiles").insert({
+      // Upload avatar if provided
+      let uploadedAvatarUrl = null;
+      if (avatarFile) {
+        setIsUploading(true);
+        const fileExt = avatarFile.name.split(".").pop();
+        const filePath = `${authData.user.id}/avatar.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from("avatars")
+          .upload(filePath, avatarFile, { upsert: true });
+        
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage
+            .from("avatars")
+            .getPublicUrl(filePath);
+          uploadedAvatarUrl = urlData.publicUrl;
+        }
+        setIsUploading(false);
+      }
+
+      // Create profile with all fields
+      const locationStr = [city, country].filter(Boolean).join(", ");
+      
+      // Build profile data based on user type
+      const baseProfileData = {
         user_id: authData.user.id,
         full_name: fullName,
         email: email,
         contact_number: contactNumber || null,
         organisation: organisation || null,
-        user_type: userType,
-        approval_status: "pending",
+        user_type: userType as "advisor" | "laboratory",
+        approval_status: "pending" as const,
         invite_token_id: tokenId,
+        location: locationStr || null,
+        bio: bio || null,
+        linkedin_url: linkedinUrl || null,
+        avatar_url: uploadedAvatarUrl,
+      };
+
+      const advisorFields = userType === "advisor" ? {
+        expertise: expertise || null,
+        education: experience || null,
+      } : {};
+
+      const labFields = userType === "laboratory" ? {
+        company_type: companyType || null,
+        website_url: websiteUrl || null,
+        research_areas: researchAreas || null,
+        services: services || null,
+      } : {};
+
+      const { error: profileError } = await supabase.from("profiles").insert({
+        ...baseProfileData,
+        ...advisorFields,
+        ...labFields,
       });
 
       if (profileError) {
@@ -269,6 +362,33 @@ export default function RegisterPage() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Avatar Upload */}
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wider font-medium">
+                Profile Picture
+              </Label>
+              <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={avatarUrl} />
+                  <AvatarFallback className="bg-muted">
+                    <User className="h-6 w-6 text-muted-foreground" />
+                  </AvatarFallback>
+                </Avatar>
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                  />
+                  <div className="flex items-center gap-2 px-4 py-2 border border-input rounded-md text-sm font-medium hover:bg-muted transition-colors">
+                    <Upload className="h-4 w-4" />
+                    Upload Photo
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="fullName" className="text-xs uppercase tracking-wider font-medium">
                 Full Name *
@@ -349,6 +469,36 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="country" className="text-xs uppercase tracking-wider font-medium">
+                  Country
+                </Label>
+                <Input
+                  id="country"
+                  type="text"
+                  placeholder="Enter your country"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="h-12"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="city" className="text-xs uppercase tracking-wider font-medium">
+                  City
+                </Label>
+                <Input
+                  id="city"
+                  type="text"
+                  placeholder="Enter your city"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="h-12"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="contactNumber" className="text-xs uppercase tracking-wider font-medium">
                 Contact Number
@@ -377,6 +527,33 @@ export default function RegisterPage() {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="linkedinUrl" className="text-xs uppercase tracking-wider font-medium">
+                LinkedIn Profile
+              </Label>
+              <Input
+                id="linkedinUrl"
+                type="url"
+                placeholder="https://linkedin.com/in/yourprofile"
+                value={linkedinUrl}
+                onChange={(e) => setLinkedinUrl(e.target.value)}
+                className="h-12"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bio" className="text-xs uppercase tracking-wider font-medium">
+                Bio
+              </Label>
+              <Textarea
+                id="bio"
+                placeholder="Tell us about yourself..."
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                className="min-h-[100px]"
+              />
+            </div>
+
             <div className="space-y-3">
               <Label className="text-xs uppercase tracking-wider font-medium">
                 I am a *
@@ -401,16 +578,110 @@ export default function RegisterPage() {
               </RadioGroup>
             </div>
 
+            {/* Advisor-specific fields */}
+            {userType === "advisor" && (
+              <div className="space-y-4 pt-4 border-t border-divider">
+                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  Advisor Details
+                </h3>
+                <div className="space-y-2">
+                  <Label htmlFor="expertise" className="text-xs uppercase tracking-wider font-medium">
+                    Areas of Expertise
+                  </Label>
+                  <Input
+                    id="expertise"
+                    type="text"
+                    placeholder="e.g., Biotechnology, Drug Development, Clinical Trials"
+                    value={expertise}
+                    onChange={(e) => setExpertise(e.target.value)}
+                    className="h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="experience" className="text-xs uppercase tracking-wider font-medium">
+                    Experience / Background
+                  </Label>
+                  <Textarea
+                    id="experience"
+                    placeholder="Describe your professional experience..."
+                    value={experience}
+                    onChange={(e) => setExperience(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Laboratory-specific fields */}
+            {userType === "laboratory" && (
+              <div className="space-y-4 pt-4 border-t border-divider">
+                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  Laboratory Details
+                </h3>
+                <div className="space-y-2">
+                  <Label htmlFor="companyType" className="text-xs uppercase tracking-wider font-medium">
+                    Company Type
+                  </Label>
+                  <Input
+                    id="companyType"
+                    type="text"
+                    placeholder="e.g., CRO, Biotech, Pharmaceutical"
+                    value={companyType}
+                    onChange={(e) => setCompanyType(e.target.value)}
+                    className="h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="websiteUrl" className="text-xs uppercase tracking-wider font-medium">
+                    Company Website
+                  </Label>
+                  <Input
+                    id="websiteUrl"
+                    type="url"
+                    placeholder="https://yourcompany.com"
+                    value={websiteUrl}
+                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                    className="h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="researchAreas" className="text-xs uppercase tracking-wider font-medium">
+                    Research Areas
+                  </Label>
+                  <Input
+                    id="researchAreas"
+                    type="text"
+                    placeholder="e.g., Oncology, Neuroscience, Immunology"
+                    value={researchAreas}
+                    onChange={(e) => setResearchAreas(e.target.value)}
+                    className="h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="services" className="text-xs uppercase tracking-wider font-medium">
+                    Services Offered
+                  </Label>
+                  <Textarea
+                    id="services"
+                    placeholder="Describe the services your laboratory offers..."
+                    value={services}
+                    onChange={(e) => setServices(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                </div>
+              </div>
+            )}
+
             <Button 
               type="submit" 
               variant="primary" 
               className="w-full h-12 text-base"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploading}
             >
-              {isSubmitting ? (
+              {isSubmitting || isUploading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Registering...
+                  {isUploading ? "Uploading..." : "Registering..."}
                 </>
               ) : (
                 "Submit Registration"
