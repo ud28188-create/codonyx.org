@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Check, X, Building2, Phone, Mail, MapPin, Clock, Link2, Copy, CalendarIcon, Power } from "lucide-react";
+import { Check, X, Building2, Phone, Mail, MapPin, Clock, Link2, Copy, CalendarIcon, Power, Eye } from "lucide-react";
 import { DashboardNavbar } from "@/components/layout/DashboardNavbar";
 import { Footer } from "@/components/layout/Footer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PendingUserDetailModal } from "@/components/admin/PendingUserDetailModal";
 
 interface PendingUser {
   id: string;
@@ -34,6 +35,17 @@ interface PendingUser {
   approval_status: "pending" | "approved" | "rejected";
   avatar_url: string | null;
   company_type: string | null;
+  linkedin_url: string | null;
+  education: string | null;
+  expertise: string | null;
+  mentoring_areas: string | null;
+  languages: string | null;
+  industry_expertise: string | null;
+  company_size: string | null;
+  founded_year: number | null;
+  website_url: string | null;
+  services: string | null;
+  research_areas: string | null;
 }
 
 interface InviteConfig {
@@ -61,6 +73,8 @@ const AdminDashboard = () => {
   const [saving, setSaving] = useState(false);
   const [advisorStatusFilter, setAdvisorStatusFilter] = useState<string>("all");
   const [labStatusFilter, setLabStatusFilter] = useState<string>("all");
+  const [selectedPendingUser, setSelectedPendingUser] = useState<PendingUser | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -172,8 +186,15 @@ const AdminDashboard = () => {
         description: `User has been ${approve ? "approved" : "rejected"}.`,
       });
       setPendingUsers(prev => prev.filter(u => u.id !== profileId));
+      setIsModalOpen(false);
+      setSelectedPendingUser(null);
     }
     setProcessingId(null);
+  };
+
+  const handleViewPendingUser = (user: PendingUser) => {
+    setSelectedPendingUser(user);
+    setIsModalOpen(true);
   };
 
   const saveInviteConfig = async () => {
@@ -325,15 +346,25 @@ const AdminDashboard = () => {
             ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {pendingUsers.map((user) => (
-                  <Card key={user.id} className="overflow-hidden">
+                  <Card 
+                    key={user.id} 
+                    className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                    onClick={() => handleViewPendingUser(user)}
+                  >
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <CardTitle className="text-lg">{user.full_name}</CardTitle>
-                          <CardDescription className="flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {user.email}
-                          </CardDescription>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-12 w-12">
+                            <AvatarImage src={user.avatar_url || undefined} />
+                            <AvatarFallback>{user.full_name.slice(0,2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div className="space-y-1">
+                            <CardTitle className="text-lg">{user.full_name}</CardTitle>
+                            <CardDescription className="flex items-center gap-1">
+                              <Mail className="h-3 w-3" />
+                              {user.email}
+                            </CardDescription>
+                          </div>
                         </div>
                         <Badge 
                           variant={user.user_type === "advisor" ? "default" : "secondary"}
@@ -351,12 +382,6 @@ const AdminDashboard = () => {
                             <span>{user.organisation}</span>
                           </div>
                         )}
-                        {user.contact_number && (
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Phone className="h-4 w-4" />
-                            <span>{user.contact_number}</span>
-                          </div>
-                        )}
                         {user.location && (
                           <div className="flex items-center gap-2 text-muted-foreground">
                             <MapPin className="h-4 w-4" />
@@ -370,32 +395,21 @@ const AdminDashboard = () => {
                       </div>
 
                       {user.headline && (
-                        <p className="text-sm text-foreground">{user.headline}</p>
-                      )}
-
-                      {user.bio && (
-                        <p className="text-sm text-muted-foreground line-clamp-2">{user.bio}</p>
+                        <p className="text-sm text-foreground font-medium">{user.headline}</p>
                       )}
 
                       <div className="flex gap-2 pt-2">
                         <Button
-                          onClick={() => handleApproval(user.user_id, user.id, true)}
-                          disabled={processingId === user.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewPendingUser(user);
+                          }}
+                          variant="outline"
                           className="flex-1"
                           size="sm"
                         >
-                          <Check className="h-4 w-4 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          onClick={() => handleApproval(user.user_id, user.id, false)}
-                          disabled={processingId === user.id}
-                          variant="destructive"
-                          className="flex-1"
-                          size="sm"
-                        >
-                          <X className="h-4 w-4 mr-1" />
-                          Reject
+                          <Eye className="h-4 w-4 mr-1" />
+                          View Details
                         </Button>
                       </div>
                     </CardContent>
@@ -403,6 +417,18 @@ const AdminDashboard = () => {
                 ))}
               </div>
             )}
+
+            <PendingUserDetailModal
+              user={selectedPendingUser}
+              isOpen={isModalOpen}
+              onClose={() => {
+                setIsModalOpen(false);
+                setSelectedPendingUser(null);
+              }}
+              onApprove={(userId, profileId) => handleApproval(userId, profileId, true)}
+              onReject={(userId, profileId) => handleApproval(userId, profileId, false)}
+              isProcessing={processingId !== null}
+            />
           </TabsContent>
 
           {/* Advisors Tab */}
