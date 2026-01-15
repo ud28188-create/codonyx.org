@@ -108,6 +108,7 @@ export function useConnections(currentProfileId: string | null) {
     if (!currentProfileId) return false;
 
     try {
+      // First, insert the connection request
       const { error } = await supabase
         .from("connections")
         .insert({
@@ -123,6 +124,55 @@ export function useConnections(currentProfileId: string | null) {
           variant: "destructive",
         });
         return false;
+      }
+
+      // Fetch sender's profile data
+      const { data: senderProfile } = await supabase
+        .from("profiles")
+        .select("full_name, headline, organisation, bio")
+        .eq("id", currentProfileId)
+        .single();
+
+      // Fetch receiver's profile data (need email from auth.users via their profile)
+      const { data: receiverProfile } = await supabase
+        .from("profiles")
+        .select("full_name, user_id")
+        .eq("id", targetProfileId)
+        .single();
+
+      // Get receiver's email from auth
+      if (receiverProfile?.user_id && senderProfile) {
+        const { data: userData } = await supabase.auth.admin?.getUserById?.(receiverProfile.user_id) || {};
+        
+        // Use edge function to send email - get email from profiles or use a workaround
+        // We'll fetch the email from the profiles table if available, otherwise skip email
+        const { data: receiverEmail } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("id", targetProfileId)
+          .single();
+
+        if (receiverEmail?.email) {
+          const connectionPageUrl = `${window.location.origin}/connections`;
+          
+          try {
+            await supabase.functions.invoke("send-connection-email", {
+              body: {
+                recipientEmail: receiverEmail.email,
+                recipientName: receiverProfile.full_name || "User",
+                senderName: senderProfile.full_name || "A Codonyx user",
+                senderTitle: senderProfile.headline || "",
+                senderOrganization: senderProfile.organisation || "",
+                senderBio: senderProfile.bio || "",
+                connectionPageUrl,
+              },
+            });
+            console.log("Connection email sent successfully");
+          } catch (emailError) {
+            console.error("Error sending connection email:", emailError);
+            // Don't fail the connection request if email fails
+          }
+        }
       }
 
       toast({
