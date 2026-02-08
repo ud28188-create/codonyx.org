@@ -190,6 +190,50 @@ export type Database = {
           },
         ]
       }
+      publications: {
+        Row: {
+          created_at: string
+          description: string | null
+          external_url: string | null
+          file_url: string | null
+          id: string
+          profile_id: string
+          publication_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          external_url?: string | null
+          file_url?: string | null
+          id?: string
+          profile_id: string
+          publication_type?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          external_url?: string | null
+          file_url?: string | null
+          id?: string
+          profile_id?: string
+          publication_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publications_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
