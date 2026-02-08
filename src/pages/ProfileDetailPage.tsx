@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ConnectButton } from "@/components/connections/ConnectButton";
 import { ConnectionsSection } from "@/components/connections/ConnectionsSection";
+import { ProfilePublications } from "@/components/publications/ProfilePublications";
 import { 
   Loader2, 
   ArrowLeft, 
@@ -417,6 +418,9 @@ export default function ProfileDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* Publications Section */}
+            <ProfilePublications profileId={profile.id} />
 
             {/* Connections Section - only show on own profile */}
             {isOwnProfile && currentUserProfile && (
