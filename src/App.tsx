@@ -13,12 +13,14 @@ import LaboratoriesPage from "./pages/LaboratoriesPage";
 import EditProfilePage from "./pages/EditProfilePage";
 import ProfileDetailPage from "./pages/ProfileDetailPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
+import PublicationsPage from "./pages/PublicationsPage";
 import AboutPage from "./pages/AboutPage";
 import ContactPage from "./pages/ContactPage";
 import InvestmentsPage from "./pages/InvestmentsPage";
 import ProductPage from "./pages/ProductPage";
 import TechnologyPage from "./pages/TechnologyPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsConditionsPage from "./pages/TermsConditionsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +41,7 @@ const App = () => (
           <Route path="/laboratories" element={<LaboratoriesPage />} />
           <Route path="/edit-profile" element={<EditProfilePage />} />
           <Route path="/connections" element={<ConnectionsPage />} />
+          <Route path="/publications" element={<PublicationsPage />} />
           <Route path="/profile/:id" element={<ProfileDetailPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
@@ -46,6 +49,7 @@ const App = () => (
           <Route path="/product" element={<ProductPage />} />
           <Route path="/technology" element={<TechnologyPage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsConditionsPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
